@@ -22,17 +22,17 @@
   </div>
   <div id="playHead" :style="{ left: playHeadPosition + 'px' }">
   </div>
-  <svg ref='svg' preserveAspectRatio='none' height='100' viewBox='0 0 1000 1000'
-    @dblclick='doubleClicked'>
-    <!-- <g>
-      <text x='0' y='0'>Hello</text>
-    </g> -->
-    <g>
-      <rect v-for='(handle, index) in handles' :key='index' :x='handle.t * 990' width='10' :height='1000' style='fill:rgb(0,0,255);stroke-width:1;stroke:rgb(0,0,0)'
+  <div id='timeline'>
+    <div>
+      <div v-for="t in animationProperties" :key="t">{{t}}</div>
+    </div>
+    <svg ref='svg' preserveAspectRatio='none' height='100' viewBox='0 0 100 100'
+      @dblclick='doubleClicked'>
+      <rect v-for='(handle, index) in handles' :key='index' :x='handle.t * 99' width='1' height='100' style='fill:rgb(0,0,255);stroke-width:0.2;stroke:rgb(0,0,0)'
         @mousedown='handleMouseDown(handle)'
         @click='selectHandle(handle)'/>
-    </g>
-  </svg>
+    </svg>
+  </div>
 </template>
 
 <script setup>
@@ -57,6 +57,8 @@ class Handle {
   }
 }
 
+const animationProperties = [ 'x', 'y', 'scale_x', 'scale_y', 'rotation' ];
+
 const svg = ref();
 let handles = reactive([
   new Handle(0),
@@ -71,7 +73,8 @@ const playing = ref(false);
 const currentTime = ref(0);
 const playHeadPosition = computed(() => {
   if(!svg.value) return 0;
-  return Math.max(0, currentTime.value * svg.value.getAttribute('width') - 10);
+  const bbox = svg.value.getBoundingClientRect();
+  return Math.max(0, 110 + currentTime.value * (bbox.right - 110) - 10);
 });
 
 let lastTime = Date.now();
@@ -128,9 +131,11 @@ function stop() {
 
 function getT(mouseX) {
   if(!svg.value) return;
-  const svgWidth = parseInt(svg.value.getAttribute('width'));
-  const x = (mouseX / svgWidth) * 1000;
-  return Math.min(1000 - 10, Math.max(0, x - 5)) / (1000 - 10);
+  const bbox = svg.value.getBoundingClientRect();
+  const svgWidth = bbox.width;
+  console.log(mouseX);
+  const x = (mouseX / svgWidth) * 100;
+  return Math.min(100 - 1, Math.max(0, x - 0.5)) / (100 - 1);
 }
 
 function doubleClicked(ev) {
@@ -143,8 +148,7 @@ function handleMouseDown(s) {
 
 function mouseMove(ev) {
   if(!svg.value) return;
-
-  if(dragging) {
+  if(dragging && (ev.target == svg.value || ev.target.parentNode == svg.value)) {
     dragging.t = getT(ev.offsetX);
     // Sort handles by t value
     handles.sort((a, b) => a.t - b.t);
@@ -162,12 +166,6 @@ function selectHandle(handle) {
 onMounted(() => {
   window.addEventListener('mouseup', mouseUp);
   window.addEventListener('mousemove', mouseMove);
-  const svgV = svg.value;
-  window.addEventListener('resize', () => {
-    svgV.setAttribute('width', document.body.clientWidth);
-  });
-  svgV.setAttribute('width', document.body.clientWidth);
-  // svgV.setAttribute('viewBox', `0 0 100 100`);
 });
 </script>
 <style lang='scss'>
@@ -188,6 +186,7 @@ canvas {
 }
 svg {
   background: white;
+  width: 100%;
   rect:hover {
     cursor: col-resize;
   }
@@ -216,5 +215,16 @@ div#object {
   border: 5px solid red;
   width: 100px;
   height: 100px;
+}
+#timeline {
+  display: grid;
+  grid-template-columns: 100px auto;
+  div > div {
+    display: flex;
+    justify-content: flex-end;
+    margin-right: 10px;
+    font-size: 19px;
+    height: 19px;
+  }
 }
 </style>
