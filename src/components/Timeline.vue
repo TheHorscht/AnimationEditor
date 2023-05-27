@@ -5,7 +5,7 @@
     }'
     @dblclick='doubleClicked'
     @contextmenu.prevent>
-    <span class='handle' v-for='(handle, index) in handles' :key='index'
+    <span :class='{ handle: true, "handle-active": props.selectedHandle == handle }' v-for='(handle, index) in handles' :key='index'
       :style='{
         width: `${handleWidth}px`,
         height: `${height-1}px`,
@@ -20,16 +20,6 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue';
 
-const emit = defineEmits(['changed', 'handleSelected']);
-const props = defineProps({
-  height: {
-    type: Number, default: 20
-  },
-  handleWidth : {
-    type: Number, default: 10,
-  }
-});
-
 class Handle {
   constructor(t, value) {
     this.t = t;
@@ -37,6 +27,13 @@ class Handle {
     this.easingFunction = easingFunctions.easeInOut.func;
   }
 }
+
+const emit = defineEmits(['change', 'handleSelected']);
+const props = defineProps({
+  height: { type: Number, default: 20 },
+  handleWidth: { type: Number, default: 20, },
+  selectedHandle: { default: null }
+});
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -56,7 +53,6 @@ const width = ref(0);
 //   return bbox.width;
 // });
 
-const selectedHandle = ref(null);
 const draggingHandle = ref(null);
 let timeline = ref();
 const handles = reactive([
@@ -82,7 +78,7 @@ function mouseMove(ev) {
     draggingHandle.value.t = (x - props.handleWidth/2) / (bbox.width - props.handleWidth);
     // Sort handles by t value
     handles.sort((a, b) => a.t - b.t);
-    emit('changed', handles);
+    emit('change', handles);
   }
 }
 
@@ -93,7 +89,7 @@ function mouseUp() {
 function doubleClicked(ev) {
   handles.push(new Handle(getT(ev.clientX)));
   handles.sort((a, b) => a.t - b.t);
-  emit('changed', handles);
+  emit('change', handles);
 }
 
 onMounted(() => {
@@ -109,7 +105,7 @@ onMounted(() => {
 });
 
 function handleMouseDown(handle) {
-  selectedHandle.value = handle;
+  // selectedHandle.value = handle;
   draggingHandle.value = handle;
   emit('handleSelected', handle);
 }
@@ -131,5 +127,8 @@ function removeHandle(handle) {
   border: 1px solid #214154;
   cursor: col-resize;
   background: #3b51a1;
+  &-active {
+    background: red;
+  }
 }
 </style>

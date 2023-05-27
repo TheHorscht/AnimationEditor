@@ -1,28 +1,14 @@
 <template>
   <div id='objectContainer'>
-    <!-- <div id='object' :style='{
-      left: `${object.x}px`,
-      bottom: `${object.y}px`,
-      transform: `rotate(${object.rotation}deg) scaleX(${1 + object.scale_x}) scaleY(${1 + object.scale_y})`,
-    }'></div> -->
     <div :style='{
       display: "flex",
       "justify-content": "center",
-      "align-items": "center",
-      width: "200px",
-      height: "200px",
-      border: "1px solid white",
+      "align-items": "flex-end",
+      width: "400px",
+      height: "400px",
+      "border-bottom": "1px solid white",
     }'>
-      <div :style='{
-        display: "flex",
-        "justify-content": "center",
-        width: "200px",
-        height: "100px",
-        "border-bottom": "1px solid blue",
-        "align-items": "flex-end",
-      }'>
-        <Box :x='object.x' :y='object.y' :scaleX='object.scale_x' :scaleY='object.scale_y' :rotation='object.rotation'></Box>
-      </div>
+      <Box :x='object.x' :y='object.y' :scaleX='object.scaleX' :scaleY='object.scaleY' :rotation='object.rotation' @change='boxChanged'></Box>
     </div>
   </div>
   <div class='controls'>
@@ -49,7 +35,7 @@
       <div v-for='t in animationProperties' :key='t'>{{t}}</div>
     </div>
     <div>
-      <Timeline v-for='(prop, index) in animationProperties' :ref='el => timelines[prop] = el' @handleSelected='handleSelected' @changed="() => null"></Timeline>
+      <Timeline v-for='(prop, index) in animationProperties' :ref='el => timelines[prop] = el' @handleSelected='handleSelected' @change="() => null" :selectedHandle='selectedHandle'></Timeline>
     </div>
   </div>
 </template>
@@ -70,7 +56,7 @@ const easingFunctions = {
   easeInOut: { name: 'EaseInOut', func: t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2 },
 }
 
-const animationProperties = ref([ 'x', 'y', 'scale_x', 'scale_y', 'rotation' ]);
+const animationProperties = ref([ 'x', 'y', 'scaleX', 'scaleY', 'rotation' ]);
 const timelines = ref({});
 const duration = 2;
 // const object = ref();
@@ -82,8 +68,8 @@ const currentTime = ref(0);
 const object = reactive({
   x: 0,
   y: 0,
-  scale_x: 0,
-  scale_y: 0,
+  scaleX: 0,
+  scaleY: 0,
   rotation: 0,
 });
 let firstTimeline = ref(null);
@@ -172,14 +158,33 @@ function mouseMove(ev) {
   }
 }
 
+function boxChanged({ prop, value }) {
+  object[prop] = value;
+  // Get closest handle with the current prop value and change it's value
+  const closestHandle = {
+    handle: timelines.value[prop].handles[0],
+    dist: Infinity
+  };
+  timelines.value[prop].handles.forEach(handle => {
+    if(handle != closestHandle) {
+      const dist = Math.abs(handle.t - currentTime.value);
+      if(dist < closestHandle.dist) {
+        closestHandle.handle = handle;
+        closestHandle.dist = dist;
+      }
+    }
+  });
+  closestHandle.handle.value = value;
+  closestHandle.handle.t = currentTime.value;
+  selectedHandle.value = closestHandle.handle;
+}
+
 onMounted(() => {
   firstTimeline.value = document.querySelector('#timeline > div:nth-child(2)');
   window.addEventListener('mouseup', mouseUp);
   window.addEventListener('mousemove', mouseMove);
-  timelines.value.scale_x.handles.forEach(handle => handle.value = 1);
-  timelines.value.scale_y.handles.forEach(handle => handle.value = 1);
-  // timelines.value.scale_x.handles[0].value = 1;
-  // timelines.value.scale_y.handles[0].value = 1;
+  timelines.value.scaleX.handles.forEach(handle => handle.value = 1);
+  timelines.value.scaleY.handles.forEach(handle => handle.value = 1);
 });
 </script>
 
@@ -249,6 +254,8 @@ div#object {
 #timeline {
   display: grid;
   grid-template-columns: 100px auto;
+  max-width: 100%;
+  overflow: hidden;
   div:nth-child(1) > div {
     display: flex;
     justify-content: flex-end;
