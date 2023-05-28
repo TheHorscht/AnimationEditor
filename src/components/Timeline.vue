@@ -19,6 +19,7 @@
 
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue';
+import { clamp, easingFunctions } from '@/utils';
 
 class Handle {
   constructor(t, value) {
@@ -35,30 +36,13 @@ const props = defineProps({
   selectedHandle: { default: null }
 });
 
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
-const easingFunctions = {
-  none: { name: 'Linear', func: t => t },
-  easeIn: { name: 'EaseIn', func: t => t * t },
-  easeOut: { name: 'EaseOut', func: t => 1 - (1 - t) * (1 - t) },
-  easeInOut: { name: 'EaseInOut', func: t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2 },
-}
-
 const width = ref(0);
-// const width = computed(() => {
-//   if(!timeline.value) return 0;
-//   const bbox = timeline.value.getBoundingClientRect();
-//   return bbox.width;
-// });
-
 const draggingHandle = ref(null);
 let timeline = ref();
 const handles = reactive([
-  new Handle(0.0, 0),
-  new Handle(0.5, 0),
-  new Handle(1.0, 0),
+  reactive(new Handle(0.0, 0)),
+  reactive(new Handle(0.5, 0)),
+  reactive(new Handle(1.0, 0)),
 ]);
 
 defineExpose({ handles });
@@ -87,8 +71,11 @@ function mouseUp() {
 }
 
 function doubleClicked(ev) {
-  handles.push(new Handle(getT(ev.clientX)));
+  const newHandle = new Handle(getT(ev.clientX));
+  // const newHandle = reactive(new Handle(getT(ev.clientX)));
+  handles.push(newHandle);
   handles.sort((a, b) => a.t - b.t);
+  emit('handleSelected', newHandle);
   emit('change', handles);
 }
 

@@ -13,8 +13,11 @@
   </div>
   <div class='controls'>
     <div class='handleControls' v-if='selectedHandle'>
-      <label>Time <input type='number' v-model='selectedHandle.t' step='0.01'/></label>
-      <label>Value <input type='number' v-model='selectedHandle.value'/></label>
+      <label>Time <input type='number' v-model='selectedHandleT' step='0.01'/></label>
+      <span>
+        <label>Value <input type='number' v-model='selectedHandle.value'/></label>
+        <input type="button" value="Reset" @click='selectedHandle.value = 0'>
+      </span>
       <label>
         Easing function
         <select v-model='selectedHandle.easingFunction'>
@@ -28,69 +31,44 @@
     <input type='button' value='Pause' @click='pause'>
     <input type='button' value='Stop' @click='stop'>
   </div>
-  <div id='playHead' :style='{ left: `${playHeadPosition}px` }' @mousedown='playHeadMouseDown'>
-  </div>
   <div id='timeline'>
-    <div>
+    <div style='grid-row: 2;'>
       <div v-for='t in animationProperties' :key='t'>{{t}}</div>
     </div>
-    <div>
-      <Timeline v-for='(prop, index) in animationProperties' :ref='el => timelines[prop] = el' @handleSelected='handleSelected' @change="() => null" :selectedHandle='selectedHandle'></Timeline>
+    <Transport :t='currentTime' @change='ev => currentTime = (console.log(ev.t), ev.t)' style='grid-column: 2;'></Transport>
+    <div style='grid-column: 2; grid-row: 2; overflow: hidden;'>
+      <Timeline v-for='(prop, index) in animationProperties' :ref='el => timelines[prop] = el' @handleSelected='handleSelected' @change="handleChanged" :selectedHandle='selectedHandle'></Timeline>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { clamp, easingFunctions } from '@/utils';
 import Timeline from './components/Timeline.vue';
 import Box from './components/Box.vue';
-
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
-const easingFunctions = {
-  none: { name: 'Linear', func: t => t },
-  easeIn: { name: 'EaseIn', func: t => t * t },
-  easeOut: { name: 'EaseOut', func: t => 1 - (1 - t) * (1 - t) },
-  easeInOut: { name: 'EaseInOut', func: t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2 },
-}
+import Transport from './components/Transport.vue';
 
 const animationProperties = ref([ 'x', 'y', 'scaleX', 'scaleY', 'rotation' ]);
 const timelines = ref({});
 const duration = 2;
-// const object = ref();
 const selectedHandle = ref(null);
 let selectedProp = null;
 const playing = ref(false);
-let draggingPlayHead = false;
 const currentTime = ref(0);
-const object = reactive({
-  x: 0,
-  y: 0,
-  scaleX: 0,
-  scaleY: 0,
-  rotation: 0,
-});
-let firstTimeline = ref(null);
-const playHeadPosition = computed(() => {
-  if(!firstTimeline.value) return 0;
-  const bbox = firstTimeline.value.getBoundingClientRect();
-  return Math.max(0, 110 + currentTime.value * (bbox.right - 110) - 10);
-});
-watch(playHeadPosition, () => {
-  updateAnimation();
-});
-let lastTime = Date.now();
-let animationFrame = null;
-
-function lerp(start, end, t) {
-  return start * (1 - t) + end * t;
-}
-
-function updateAnimation() {
+const object = computed(() => {
+  const object = {
+    x: 0,
+    y: 0,
+    scaleX: 0,
+    scaleY: 0,
+    rotation: 0,
+  };
   for(const prop of animationProperties.value) {
     const timeline = timelines.value[prop];
+    if(!timeline) {
+      return object;
+    }
     let handle1 = timeline.handles[0];
     let handle2 = timeline.handles[1];
     for(let i = 1; i < timeline.handles.length-1; i++) {
@@ -101,12 +79,21 @@ function updateAnimation() {
       handle1 = nextHandle;
       handle2 = timeline.handles[i+1];
     }
-  
-    const t = clamp((currentTime.value - handle1.t) / (handle2.t - handle1.t), 0, 1);
-    const value = lerp(handle1.value, handle2.value, handle2.easingFunction(t));
-  
-    object[prop] = value;
+    const t = clamp((currentTime.value - handle1.t) / (handle2.t - handle1.t), 0, 1);  
+    object[prop] = lerp(handle1.value, handle2.value, handle2.easingFunction(t));
   }
+  return object;
+});
+let firstTimeline = ref(null);
+const selectedHandleT = computed({
+  get: () => selectedHandle.value.t.toFixed(2),
+  set: value => selectedHandle.value.t = value,
+})
+let lastTime = Date.now();
+let animationFrame = null;
+
+function lerp(start, end, t) {
+  return start * (1 - t) + end * t;
 }
 
 function advanceTime() {
@@ -139,23 +126,11 @@ function stop() {
 
 function handleSelected(handle) {
   selectedHandle.value = handle;
+  currentTime.value = handle.t;
 }
 
-function playHeadMouseDown(ev) {
-  draggingPlayHead = true;
-}
-
-function mouseUp(ev) {
-  draggingPlayHead = false;
-}
-
-function mouseMove(ev) {
-  if(draggingPlayHead && firstTimeline.value) {
-    const bbox = firstTimeline.value.getBoundingClientRect();
-    const playHeadWidth = 10;
-    const x = clamp(ev.clientX, bbox.left + playHeadWidth/2, bbox.right - playHeadWidth/2) - bbox.left;
-    currentTime.value = x / bbox.width;
-  }
+function handleChanged(handles) {
+  currentTime.value = selectedHandle.value.t;
 }
 
 function boxChanged({ prop, value }) {
@@ -181,8 +156,6 @@ function boxChanged({ prop, value }) {
 
 onMounted(() => {
   firstTimeline.value = document.querySelector('#timeline > div:nth-child(2)');
-  window.addEventListener('mouseup', mouseUp);
-  window.addEventListener('mousemove', mouseMove);
   timelines.value.scaleX.handles.forEach(handle => handle.value = 1);
   timelines.value.scaleY.handles.forEach(handle => handle.value = 1);
 });
@@ -193,7 +166,7 @@ onMounted(() => {
 #app {
   display: grid;
   font-family: 'Roboto', sans-serif;
-  grid-template-rows: 1fr auto auto 15px 100px;
+  grid-template-rows: 1fr auto auto 30px 100px;
   width: 100vw;
   height: 100vh;
 }
@@ -227,19 +200,8 @@ svg {
   justify-content: center;
   align-items: center;
 }
-#playHead {
-  position: relative;
-  width: 0;
-  height: 0;
-  border: solid white;
-  border-width: 0 3px 3px 0;
-  display: inline-block;
-  padding: 3px;
-  transform: rotate(45deg);
-}
 .controls {
-  margin: auto;
-  margin-top: 20px;
+  margin: 5px auto;
 }
 .handleControls > * {
   display: block;
@@ -255,7 +217,7 @@ div#object {
   display: grid;
   grid-template-columns: 100px auto;
   max-width: 100%;
-  overflow: hidden;
+  // overflow: hidden;
   div:nth-child(1) > div {
     display: flex;
     justify-content: flex-end;
