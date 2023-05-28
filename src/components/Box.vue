@@ -7,6 +7,7 @@
     <div class='handle bottom' @mousedown='startDrag($event, directions.bottom)' :style='{ width: `${props.width * props.scaleX}px` }'></div>
     <div class='handle translateX' @mousedown='startDrag($event, directions.translateX)' :style='{ right: "-60px", top: "calc(50% - 7px)" }'></div>
     <div class='handle translateY' @mousedown='startDrag($event, directions.translateY)' :style='{ left: "calc(50% - 7px)", top: "-60px" }'></div>
+    <div class='handle rotate' @mousedown='startDrag($event, directions.rotate)'></div>
   </div>
 </template>
 
@@ -20,6 +21,8 @@ const directions = Object.freeze({
   right: 3,
   bottom: 4,
   translateX: 5,
+  translateY: 6,
+  rotate: 7,
 });
 
 const props = defineProps({
@@ -52,6 +55,17 @@ function startDrag(ev, direction) {
   startPos.y = ev.clientY;
   startValue.x = props.x;
   startValue.y = props.y;
+  startValue.rotation = props.rotation;
+  const lookup = {
+    [directions.left]: { prop: 'scaleX', value: props.scaleX },
+    [directions.top]: { prop: 'scaleY', value: props.scaleY },
+    [directions.right]: { prop: 'scaleX', value: props.scaleX },
+    [directions.bottom]: { prop: 'scaleY', value: props.scaleY },
+    [directions.translateX]: { prop: 'x', value: props.x },
+    [directions.translateY]: { prop: 'y', value: props.y },
+    [directions.rotate]: { prop: 'rotation', value: props.rotation },
+  }
+  emit('change', lookup[direction]);
 }
 
 const emit = defineEmits(['change']);
@@ -66,7 +80,6 @@ const translateFuncs = {
   [directions.translateY]: (x, y, center) => emit('change', { prop: 'y', value: startValue.y + (startPos.y - y) }),
 };
 function mouseMove(ev) {
-  // console.log(draggingDirection);
   if(scaleFuncs[draggingDirection]) {
     /** @type {DOMRect} */
     const bbox = box.value.getBoundingClientRect();
@@ -78,7 +91,8 @@ function mouseMove(ev) {
   } else if(translateFuncs[draggingDirection]) {
     /** @type {DOMRect} */
     translateFuncs[draggingDirection](ev.clientX, ev.clientY, origin);
-
+  } else if(draggingDirection == directions.rotate) {
+    emit('change', { prop: 'rotation', value: startValue.rotation + (ev.clientX - startPos.x) });
   }
 }
 
@@ -96,6 +110,10 @@ onMounted(() => {
 </script>
 
 <style lang='scss'>
+:root {
+  --x-transform-color: #23db23;
+  --y-transform-color: #2942ef;
+}
 .box {
   position: relative;
   display: inline-block;
@@ -104,7 +122,7 @@ onMounted(() => {
 }
 .handle {
   position: absolute;
-  border: 1px solid blue;
+  // border: 1px solid blue;
 }
 .left, .right {
   width: 11px;
@@ -145,8 +163,8 @@ onMounted(() => {
     width: 5px;
     top: 2px;
     right: -1px;
-    border-top: 2px solid red;
-    border-right: 2px solid red;
+    border-top: 2px solid var(--x-transform-color);
+    border-right: 2px solid var(--x-transform-color);
     border-radius: 2px;
     transform: rotate(45deg);
   }
@@ -156,7 +174,7 @@ onMounted(() => {
     display: block;
     height: 1px;
     top: 5px;
-    background-color: red;
+    background-color: var(--x-transform-color);
   }
 }
 .translateY {
@@ -170,8 +188,8 @@ onMounted(() => {
     height: 5px;
     width: 5px;
     left: 2px;
-    border-top: 2px solid red;
-    border-left: 2px solid red;
+    border-top: 2px solid var(--y-transform-color);
+    border-left: 2px solid var(--y-transform-color);
     border-radius: 2px;
     transform: rotate(45deg);
   }
@@ -184,7 +202,45 @@ onMounted(() => {
     width: 1px;
     height: 100%;
     left: 5px;
-    background-color: red;
+    background-color: var(--y-transform-color);
+  }
+}
+.rotate {
+  display: inline-block;
+  position: relative;
+  display: block;
+  width: 20px;
+  height: 20px;
+  border: 1px solid red;
+  border-radius: 15px;
+  top: calc(50% - 11px);
+  left: calc(50% - 11px);
+  cursor: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABH0lEQVQ4jZ3TMSuFcRQG8HNvMplukkG6ScabwSCjQSmDdAfJZLJZfAHJYPAJfAApMsonMJoMkmK4H0CRkH4G59UbL/dyln+d93me/3PO+/wjstDCGfriD1UGb0TEXETs4CIi5iNiLL/dRsRpRBzVarWXbypo4FH3usNclcBmBXgFwxjCLA7whleslsl1XFcInODrRYt4wjNaRXO2RLrHBQ6xjf4Kt+uJPSsaw5hOq123no6vcpyRroQfRPbSRbv+L4WITp6NeiquYfIPAgN5PhQZkMvriY0ZHGOwaJynSLMH8ujnLyw1J3KM8MtbwDg6PlL7fX/YyixslgHFaNhPp7s/3bCcSePjdS7hJpO3kPYXf90VmmjnOOtp9xJTVfh3Vy+OrLfhOBIAAAAASUVORK5CYII=) 8 8, auto;
+  &::before {
+    content: '';
+    position: relative;
+    display: block;
+    width: 6px;
+    height: 6px;
+    left: -4px;
+    top: 7px;
+    border-top: 1px solid red;
+    border-left: 1px solid red;
+    border-radius: 2px;
+    transform: rotate(45deg);
+  }
+  &::after {
+    content: '';
+    position: absolute;
+    display: block;
+    width: 6px;
+    height: 6px;
+    right: -4px;
+    top: 5px;
+    border-bottom: 1px solid red;
+    border-right: 1px solid red;
+    border-radius: 2px;
+    transform: rotate(45deg);
   }
 }
 </style>

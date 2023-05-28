@@ -15,7 +15,7 @@
     <div class='handleControls' v-if='selectedHandle'>
       <label>Time <input type='number' v-model='selectedHandleT' step='0.01'/></label>
       <span>
-        <label>Value <input type='number' v-model='selectedHandle.value'/></label>
+        <label>Value <input type='number' v-model='selectedHandleValue'/></label>
         <input type="button" value="Reset" @click='selectedHandle.value = 0'>
       </span>
       <label>
@@ -35,7 +35,7 @@
     <div style='grid-row: 2;'>
       <div v-for='t in animationProperties' :key='t'>{{t}}</div>
     </div>
-    <Transport :t='currentTime' @change='ev => currentTime = (console.log(ev.t), ev.t)' style='grid-column: 2;'></Transport>
+    <Transport :t='currentTime' @change='ev => currentTime = ev.t' style='grid-column: 2;'></Transport>
     <div style='grid-column: 2; grid-row: 2; overflow: hidden;'>
       <Timeline v-for='(prop, index) in animationProperties' :ref='el => timelines[prop] = el' @handleSelected='handleSelected' @change="handleChanged" :selectedHandle='selectedHandle'></Timeline>
     </div>
@@ -89,6 +89,10 @@ const selectedHandleT = computed({
   get: () => selectedHandle.value.t.toFixed(2),
   set: value => selectedHandle.value.t = value,
 })
+const selectedHandleValue = computed({
+  get: () => selectedHandle.value.value.toFixed(2),
+  set: value => selectedHandle.value.value = value,
+})
 let lastTime = Date.now();
 let animationFrame = null;
 
@@ -129,6 +133,14 @@ function handleSelected(handle) {
   currentTime.value = handle.t;
 }
 
+class Handle {
+  constructor(t, value) {
+    this.t = t;
+    this.value = value || 0;
+    this.easingFunction = easingFunctions.easeInOut.func;
+  }
+}
+
 function handleChanged(handles) {
   currentTime.value = selectedHandle.value.t;
 }
@@ -149,9 +161,13 @@ function boxChanged({ prop, value }) {
       }
     }
   });
-  closestHandle.handle.value = value;
-  closestHandle.handle.t = currentTime.value;
-  selectedHandle.value = closestHandle.handle;
+  if(closestHandle.dist < 0.05) {
+    closestHandle.handle.value = value;
+    closestHandle.handle.t = currentTime.value;
+    selectedHandle.value = closestHandle.handle;
+  } else {
+    timelines.value[prop].addHandle(currentTime.value, value); //.handles.push(reactive(new Handle(currentTime.value, value)));
+  }
 }
 
 onMounted(() => {
@@ -166,7 +182,7 @@ onMounted(() => {
 #app {
   display: grid;
   font-family: 'Roboto', sans-serif;
-  grid-template-rows: 1fr auto auto 30px 100px;
+  grid-template-rows: 1fr auto auto 30px 100px 1px;
   width: 100vw;
   height: 100vh;
 }

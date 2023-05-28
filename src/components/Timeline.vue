@@ -45,8 +45,6 @@ const handles = reactive([
   reactive(new Handle(1.0, 0)),
 ]);
 
-defineExpose({ handles });
-
 function getT(mouseX) {
   if(!timeline.value) return 0;
   const bbox = timeline.value.getBoundingClientRect();
@@ -70,14 +68,24 @@ function mouseUp() {
   draggingHandle.value = null;
 }
 
-function doubleClicked(ev) {
-  const newHandle = new Handle(getT(ev.clientX));
-  // const newHandle = reactive(new Handle(getT(ev.clientX)));
+function addHandle(t, value) {
+  const newHandle = new Handle(t, value);
   handles.push(newHandle);
   handles.sort((a, b) => a.t - b.t);
   emit('handleSelected', newHandle);
   emit('change', handles);
 }
+
+function doubleClicked(ev) {
+  // const newHandle = new Handle(getT(ev.clientX));
+  // handles.push(newHandle);
+  // handles.sort((a, b) => a.t - b.t);
+  // emit('handleSelected', newHandle);
+  // emit('change', handles);
+  addHandle(getT(ev.clientX));
+}
+
+defineExpose({ handles, addHandle });
 
 onMounted(() => {
   function updateWidth() {
