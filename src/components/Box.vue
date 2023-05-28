@@ -137,9 +137,54 @@ onMounted(() => {
 .translateX {
   height: 11px;
   width: 50px;
+  &::before {
+    content: '';
+    position: absolute;
+    display: block;
+    height: 5px;
+    width: 5px;
+    top: 2px;
+    right: -1px;
+    border-top: 2px solid red;
+    border-right: 2px solid red;
+    border-radius: 2px;
+    transform: rotate(45deg);
+  }
+  &::after {
+    content: '';
+    position: relative;
+    display: block;
+    height: 1px;
+    top: 5px;
+    background-color: red;
+  }
 }
 .translateY {
   height: 50px;
   width: 11px;
+  // Arrow
+  &::before {
+    content: '';
+    position: absolute;
+    display: block;
+    height: 5px;
+    width: 5px;
+    left: 2px;
+    border-top: 2px solid red;
+    border-left: 2px solid red;
+    border-radius: 2px;
+    transform: rotate(45deg);
+  }
+  // Handle
+  &::after {
+    content: ' ';
+    display: inline-block;
+    position: relative;
+    display: block;
+    width: 1px;
+    height: 100%;
+    left: 5px;
+    background-color: red;
+  }
 }
 </style>
