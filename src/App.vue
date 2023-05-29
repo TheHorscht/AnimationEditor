@@ -31,8 +31,9 @@
     <input type='button' value='Play' @click='play'>
     <input type='button' value='Pause' @click='pause'>
     <input type='button' value='Stop' @click='stop'>
-    <input type='button' value='Export' @click='saveDataClick'>
-    <input type='button' value='Import' @click='loadDataClick'>
+    <input type='button' value='Save' @click='saveDataClick'>
+    <input type='button' value='Load' @click='loadDataClick'>
+    <input type='button' value='Export' @click='exportClick'>
   </div>
   <div id='timeline'>
     <div style='grid-row: 2;'>
@@ -161,6 +162,32 @@ function loadDataClick() {
   }
 }
 
+function exportClick() {
+  const getValueAt = (prop, t) => {
+    const timeline = timelines.value[prop];
+    let handle1 = timeline.handles[0];
+    let handle2 = timeline.handles[1];
+    for(let i = 1; i < timeline.handles.length-1; i++) {
+      const nextHandle = timeline.handles[i];
+      if(nextHandle.t > t) {
+        break;
+      }
+      handle1 = nextHandle;
+      handle2 = timeline.handles[i+1];
+    }
+    const t2 = clamp((t - handle1.t) / (handle2.t - handle1.t), 0, 1);  
+    return lerp(handle1.value, handle2.value, easingFunctions[handle2.easingFunction].func(t2));
+  };
+  let out = {};
+  animationProperties.value.forEach(prop => {
+    out[prop] = [];
+    for(let i = 0; i < 1; i += 1 / 120) {
+      out[prop].push(getValueAt(prop, i).toFixed(2));
+    }
+    console.log(`local val_${prop} = { ${out[prop].join(', ')} }`);
+  });
+}
+
 function exportToFile() {
   const out = {};
   animationProperties.value.forEach(prop => {
@@ -206,6 +233,7 @@ function boxChanged({ prop, value }) {
       }
     }
   });
+  // If the current playhead is close to a handle, modify that, otherwise create a new handle
   if(closestHandle.dist < 0.025) {
     closestHandle.handle.value = value;
     closestHandle.handle.t = currentTime.value;
@@ -272,7 +300,7 @@ svg {
   grid-gap: 3px;
   grid-template: 
     "a a b b c c" auto
-    ". d d e e ." auto / 1fr 1fr 1fr 1fr 1fr 1fr;
+    "d d e e f f" auto / 1fr 1fr 1fr 1fr 1fr 1fr;
   :nth-child(1) {
     grid-column: 1 / span 2;
   }
@@ -284,11 +312,15 @@ svg {
   }
   :nth-child(4) {
     grid-row: 2;
-    grid-column: 2 / span 2;
+    grid-column: 1 / span 2;
   }
   :nth-child(5) {
     grid-row: 2;
-    grid-column: 4 / span 2;
+    grid-column: 3 / span 2;
+  }
+  :nth-child(6) {
+    grid-row: 2;
+    grid-column: 5 / span 2;
   }
 }
 .handleControls > * {
