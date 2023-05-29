@@ -13,23 +13,26 @@
   </div>
   <div class='controls'>
     <div class='handleControls' v-if='selectedHandle'>
-      <label>Time <input type='number' v-model='selectedHandleT' step='0.01'/></label>
-      <span>
-        <label>Value <input type='number' v-model='selectedHandleValue'/></label>
-        <input type="button" value="Reset" @click='selectedHandle.value = 0'>
-      </span>
-      <label>
-        Easing function
-        <select v-model='selectedHandle.easingFunction'>
-          <option v-for='(easingFunction, index) in easingFunctions' :key='index' :value='easingFunction.func'>{{ easingFunction.name }}</option>
-        </select>
-      </label>
+      <label style='grid-area: a;' for='time'>Time</label>
+      <input style='grid-area: b;' id='time' type='number' v-model='selectedHandleT' step='0.01'/>
+      <label style='grid-area: c;' for='value'>Value</label>
+      <input style='grid-area: d;' id='value' type='number' v-model='selectedHandleValue'/>
+      <input style='grid-area: e;' type="button" value="Reset" @click='selectedHandle.value = defaultValues[selectedProp]'>
+      <label style='grid-area: f;'>Easing</label>
+      <div style='grid-area: g;' class='easingFunctions'>
+        <img v-for='(easingFunction, key) in easingFunctions' :src='require(`./assets/${key}.png`)'
+          :title='easingFunction.displayName'
+          @click='selectedHandle.easingFunction = key'
+          :class='{ selectedEasing: selectedHandle.easingFunction == key }'>
+      </div>
     </div>
   </div>
-  <div class='controls'>
+  <div class='control-buttons'>
     <input type='button' value='Play' @click='play'>
     <input type='button' value='Pause' @click='pause'>
     <input type='button' value='Stop' @click='stop'>
+    <input type='button' value='Export' @click='saveDataClick'>
+    <input type='button' value='Import' @click='loadDataClick'>
   </div>
   <div id='timeline'>
     <div style='grid-row: 2;'>
@@ -37,7 +40,13 @@
     </div>
     <Transport :t='currentTime' @change='ev => currentTime = ev.t' style='grid-column: 2;'></Transport>
     <div style='grid-column: 2; grid-row: 2; overflow: hidden;'>
-      <Timeline v-for='(prop, index) in animationProperties' :ref='el => timelines[prop] = el' @handleSelected='handleSelected' @change="handleChanged" :selectedHandle='selectedHandle'></Timeline>
+      <Timeline v-for='(prop, index) in animationProperties'
+        :ref='el => timelines[prop] = el'
+        @handleSelected='handleSelected($event); selectedProp = prop;'
+        @change="handleChanged"
+        :selectedHandle='selectedHandle'
+        :defaultValue='defaultValues[prop]'
+        ></Timeline>
     </div>
   </div>
 </template>
@@ -48,12 +57,15 @@ import { clamp, easingFunctions } from '@/utils';
 import Timeline from './components/Timeline.vue';
 import Box from './components/Box.vue';
 import Transport from './components/Transport.vue';
+import { saveData, loadData } from '@/storage';
+import { Handle } from '@/Handle';
 
 const animationProperties = ref([ 'x', 'y', 'scaleX', 'scaleY', 'rotation' ]);
+const defaultValues = ref({ x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
 const timelines = ref({});
 const duration = 2;
 const selectedHandle = ref(null);
-let selectedProp = null;
+const selectedProp = ref(null);
 const playing = ref(false);
 const currentTime = ref(0);
 const object = computed(() => {
@@ -80,7 +92,7 @@ const object = computed(() => {
       handle2 = timeline.handles[i+1];
     }
     const t = clamp((currentTime.value - handle1.t) / (handle2.t - handle1.t), 0, 1);  
-    object[prop] = lerp(handle1.value, handle2.value, handle2.easingFunction(t));
+    object[prop] = lerp(handle1.value, handle2.value, easingFunctions[handle2.easingFunction].func(t));
   }
   return object;
 });
@@ -128,17 +140,50 @@ function stop() {
   currentTime.value = 0;
 }
 
+function saveDataClick() {
+  // saveData({ hello: 2 });
+  const out = {};
+  animationProperties.value.forEach(prop => {
+    out[prop] = timelines.value[prop].handles;
+    console.log(out[prop]);
+  });
+  saveData(out);
+}
+
+function loadDataClick() {
+  const data = loadData();
+  for(const prop in data) {
+    // Clear the array
+    timelines.value[prop].handles.length = 0;
+    data[prop].forEach(handle => {
+      timelines.value[prop].handles.push(reactive(new Handle(handle.t, handle.value, handle.easingFunction)));
+    });
+  }
+}
+
+function exportToFile() {
+  const out = {};
+  animationProperties.value.forEach(prop => {
+    out[prop] ??= {};
+    console.log(timelines.value[prop].handles);
+  });
+  // Create a Blob object with the content you want to save
+  const fileContent = 'This is the content of the file.';
+  const blob = new Blob([fileContent], { type: 'text/plain' });
+
+  // Create a file save dialog by creating an <a> element and simulating a click event
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'filename.txt';
+  link.click();
+
+  // Clean up the URL.createObjectURL() after the file is saved
+  URL.revokeObjectURL(link.href);
+}
+
 function handleSelected(handle) {
   selectedHandle.value = handle;
   currentTime.value = handle.t;
-}
-
-class Handle {
-  constructor(t, value) {
-    this.t = t;
-    this.value = value || 0;
-    this.easingFunction = easingFunctions.easeInOut.func;
-  }
 }
 
 function handleChanged(handles) {
@@ -161,12 +206,12 @@ function boxChanged({ prop, value }) {
       }
     }
   });
-  if(closestHandle.dist < 0.05) {
+  if(closestHandle.dist < 0.025) {
     closestHandle.handle.value = value;
     closestHandle.handle.t = currentTime.value;
     selectedHandle.value = closestHandle.handle;
   } else {
-    timelines.value[prop].addHandle(currentTime.value, value); //.handles.push(reactive(new Handle(currentTime.value, value)));
+    timelines.value[prop].addHandle(currentTime.value, value);
   }
 }
 
@@ -183,7 +228,9 @@ onMounted(() => {
   display: grid;
   font-family: 'Roboto', sans-serif;
   grid-template-rows: 1fr auto auto 30px 100px 1px;
-  width: 100vw;
+  // width: 100vw;
+  width: 800px;
+  margin: auto;
   height: 100vh;
 }
 input[type="button"] {
@@ -219,6 +266,31 @@ svg {
 .controls {
   margin: 5px auto;
 }
+.control-buttons {
+  margin: 5px auto;
+  display: grid;
+  grid-gap: 3px;
+  grid-template: 
+    "a a b b c c" auto
+    ". d d e e ." auto / 1fr 1fr 1fr 1fr 1fr 1fr;
+  :nth-child(1) {
+    grid-column: 1 / span 2;
+  }
+  :nth-child(2) {
+    grid-column: 3 / span 2;
+  }
+  :nth-child(3) {
+    grid-column: 5 / span 2;
+  }
+  :nth-child(4) {
+    grid-row: 2;
+    grid-column: 2 / span 2;
+  }
+  :nth-child(5) {
+    grid-row: 2;
+    grid-column: 4 / span 2;
+  }
+}
 .handleControls > * {
   display: block;
 }
@@ -241,6 +313,32 @@ div#object {
     margin-right: 6px;
     font-size: 17px;
     height: 20px;
+  }
+}
+.handleControls {
+  display: grid;
+  grid-template:
+    "a b ." 30px
+    "c d e" 30px
+    "f g ." auto / auto auto auto;
+  margin-bottom: 20px;
+  // input {
+  //   width: 100px;
+  // }
+  >label {
+    display: flex;
+    align-items: center;
+  }
+}
+.easingFunctions {
+  display: flex;
+  justify-content: flex-end;
+  img {
+    cursor: pointer;
+    padding: 2px;
+  }
+  .selectedEasing {
+    background: #379531;
   }
 }
 </style>

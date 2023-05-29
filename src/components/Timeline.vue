@@ -20,19 +20,13 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue';
 import { clamp, easingFunctions } from '@/utils';
-
-class Handle {
-  constructor(t, value) {
-    this.t = t;
-    this.value = value || 0;
-    this.easingFunction = easingFunctions.easeInOut.func;
-  }
-}
+import { Handle } from '@/Handle';
 
 const emit = defineEmits(['change', 'handleSelected']);
 const props = defineProps({
   height: { type: Number, default: 20 },
   handleWidth: { type: Number, default: 20, },
+  defaultValue: { type: Number, default: 1 },
   selectedHandle: { default: null }
 });
 
@@ -40,9 +34,9 @@ const width = ref(0);
 const draggingHandle = ref(null);
 let timeline = ref();
 const handles = reactive([
-  reactive(new Handle(0.0, 0)),
-  reactive(new Handle(0.5, 0)),
-  reactive(new Handle(1.0, 0)),
+  reactive(new Handle(0.0, props.defaultValue)),
+  reactive(new Handle(0.5, props.defaultValue)),
+  reactive(new Handle(1.0, props.defaultValue)),
 ]);
 
 function getT(mouseX) {
@@ -77,12 +71,7 @@ function addHandle(t, value) {
 }
 
 function doubleClicked(ev) {
-  // const newHandle = new Handle(getT(ev.clientX));
-  // handles.push(newHandle);
-  // handles.sort((a, b) => a.t - b.t);
-  // emit('handleSelected', newHandle);
-  // emit('change', handles);
-  addHandle(getT(ev.clientX));
+  addHandle(getT(ev.clientX), props.defaultValue);
 }
 
 defineExpose({ handles, addHandle });
